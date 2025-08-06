@@ -8,11 +8,15 @@
 (define-constant ERR_INSUFFICIENT_FUNDS (err u104))
 (define-constant ERR_PROPOSAL_NOT_ACTIVE (err u105))
 (define-constant ERR_ALREADY_VOTED (err u106))
+(define-constant ERR_INSUFFICIENT_STAKE (err u107))
+(define-constant ERR_COOLDOWN_ACTIVE (err u108))
 
 (define-data-var next-center-id uint u1)
 (define-data-var next-proposal-id uint u1)
 (define-data-var total-recycled uint u0)
 (define-data-var dao-treasury uint u0)
+(define-data-var total-staked uint u0)
+(define-data-var staking-rewards-pool uint u0)
 
 (define-map collection-centers
   { center-id: uint }
@@ -69,6 +73,16 @@
 
 (define-data-var next-esg-id uint u1)
 
+(define-map staking-positions
+  { staker: principal }
+  {
+    amount: uint,
+    start-block: uint,
+    last-claim-block: uint,
+    cooldown-end: uint
+  }
+)
+
 (define-public (register-collection-center (name (string-ascii 64)) (location (string-ascii 128)))
   (let ((center-id (var-get next-center-id)))
     (asserts! (is-none (map-get? collection-centers { center-id: center-id })) ERR_ALREADY_EXISTS)
@@ -111,6 +125,7 @@
     (asserts! (> amount u0) ERR_INVALID_AMOUNT)
     
     (try! (ft-mint? recycle-token reward-amount tx-sender))
+    (var-set staking-rewards-pool (+ (var-get staking-rewards-pool) (/ reward-amount u10)))
     
     (map-set collection-centers
       { center-id: center-id }
@@ -159,7 +174,10 @@
 (define-public (vote-proposal (proposal-id uint) (vote-for bool))
   (let (
     (proposal (unwrap! (map-get? proposals { proposal-id: proposal-id }) ERR_NOT_FOUND))
-    (voter-weight (ft-get-balance recycle-token tx-sender))
+    (base-weight (ft-get-balance recycle-token tx-sender))
+    (staking-position (map-get? staking-positions { staker: tx-sender }))
+    (staked-amount (default-to u0 (get amount staking-position)))
+    (voter-weight (+ base-weight (* staked-amount u2)))
   )
     (asserts! (< stacks-block-height (get end-block proposal)) ERR_PROPOSAL_NOT_ACTIVE)
     (asserts! (is-none (map-get? proposal-votes { proposal-id: proposal-id, voter: tx-sender })) ERR_ALREADY_VOTED)
@@ -274,6 +292,89 @@
   )
 )
 
+(define-public (stake-tokens (amount uint))
+  (let (
+    (current-balance (ft-get-balance recycle-token tx-sender))
+    (existing-stake (map-get? staking-positions { staker: tx-sender }))
+    (current-staked (default-to u0 (get amount existing-stake)))
+  )
+    (asserts! (> amount u0) ERR_INVALID_AMOUNT)
+    (asserts! (>= current-balance amount) ERR_INSUFFICIENT_FUNDS)
+    
+    (try! (ft-transfer? recycle-token amount tx-sender (as-contract tx-sender)))
+    
+    (map-set staking-positions
+      { staker: tx-sender }
+      {
+        amount: (+ current-staked amount),
+        start-block: stacks-block-height,
+        last-claim-block: stacks-block-height,
+        cooldown-end: u0
+      }
+    )
+    
+    (var-set total-staked (+ (var-get total-staked) amount))
+    (ok amount)
+  )
+)
+
+(define-public (initiate-unstake)
+  (let ((stake (unwrap! (map-get? staking-positions { staker: tx-sender }) ERR_NOT_FOUND)))
+    (asserts! (> (get amount stake) u0) ERR_INSUFFICIENT_STAKE)
+    (asserts! (is-eq (get cooldown-end stake) u0) ERR_COOLDOWN_ACTIVE)
+    
+    (map-set staking-positions
+      { staker: tx-sender }
+      (merge stake { cooldown-end: (+ stacks-block-height u144) })
+    )
+    (ok true)
+  )
+)
+
+(define-public (complete-unstake)
+  (let ((stake (unwrap! (map-get? staking-positions { staker: tx-sender }) ERR_NOT_FOUND)))
+    (asserts! (> (get amount stake) u0) ERR_INSUFFICIENT_STAKE)
+    (asserts! (> (get cooldown-end stake) u0) ERR_COOLDOWN_ACTIVE)
+    (asserts! (>= stacks-block-height (get cooldown-end stake)) ERR_COOLDOWN_ACTIVE)
+    
+    (let ((stake-amount (get amount stake)))
+      (try! (as-contract (ft-transfer? recycle-token stake-amount tx-sender tx-sender)))
+      
+      (map-delete staking-positions { staker: tx-sender })
+      (var-set total-staked (- (var-get total-staked) stake-amount))
+      (ok stake-amount)
+    )
+  )
+)
+
+(define-public (claim-staking-rewards)
+  (let (
+    (stake (unwrap! (map-get? staking-positions { staker: tx-sender }) ERR_NOT_FOUND))
+    (blocks-elapsed (- stacks-block-height (get last-claim-block stake)))
+    (stake-amount (get amount stake))
+    (total-staked-amount (var-get total-staked))
+    (rewards-pool (var-get staking-rewards-pool))
+    (reward-amount (if (> total-staked-amount u0)
+      (/ (* (* stake-amount blocks-elapsed) rewards-pool) (* total-staked-amount u1000))
+      u0
+    ))
+  )
+    (asserts! (> stake-amount u0) ERR_INSUFFICIENT_STAKE)
+    (asserts! (> reward-amount u0) ERR_INVALID_AMOUNT)
+    (asserts! (>= rewards-pool reward-amount) ERR_INSUFFICIENT_FUNDS)
+    
+    (try! (ft-mint? recycle-token reward-amount tx-sender))
+    (var-set staking-rewards-pool (- rewards-pool reward-amount))
+    
+    (map-set staking-positions
+      { staker: tx-sender }
+      (merge stake { last-claim-block: stacks-block-height })
+    )
+    
+    (ok reward-amount)
+  )
+)
+
 (define-read-only (get-collection-center (center-id uint))
   (map-get? collection-centers { center-id: center-id })
 )
@@ -300,4 +401,32 @@
 
 (define-read-only (get-token-balance (user principal))
   (ft-get-balance recycle-token user)
+)
+
+(define-read-only (get-staking-position (staker principal))
+  (map-get? staking-positions { staker: staker })
+)
+
+(define-read-only (get-total-staked)
+  (var-get total-staked)
+)
+
+(define-read-only (get-staking-rewards-pool)
+  (var-get staking-rewards-pool)
+)
+
+(define-read-only (calculate-staking-rewards (staker principal))
+  (let (
+    (stake (map-get? staking-positions { staker: staker }))
+    (stake-amount (default-to u0 (get amount stake)))
+    (last-claim (default-to u0 (get last-claim-block stake)))
+    (blocks-elapsed (- stacks-block-height last-claim))
+    (total-staked-amount (var-get total-staked))
+    (rewards-pool (var-get staking-rewards-pool))
+  )
+    (if (and (> stake-amount u0) (> total-staked-amount u0))
+      (/ (* (* stake-amount blocks-elapsed) rewards-pool) (* total-staked-amount u1000))
+      u0
+    )
+  )
 )
