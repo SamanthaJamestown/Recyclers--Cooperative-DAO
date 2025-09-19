@@ -430,3 +430,12 @@
     )
   )
 )
+
+(define-public (transfer-tokens (amount uint) (recipient principal))
+  (begin
+    (asserts! (> amount u0) ERR_INVALID_AMOUNT)
+    (asserts! (not (is-eq tx-sender recipient)) ERR_UNAUTHORIZED)
+    (try! (ft-transfer? recycle-token amount tx-sender recipient))
+    (ok true)
+  )
+)
