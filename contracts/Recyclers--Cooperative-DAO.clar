@@ -431,6 +431,34 @@
   )
 )
 
+(define-data-var emergency-fund uint u0)
+
+(define-public (contribute-emergency-fund (amount uint))
+  (begin
+    (asserts! (> amount u0) ERR_INVALID_AMOUNT)
+    (try! (stx-transfer? amount tx-sender (as-contract tx-sender)))
+    (var-set emergency-fund (+ (var-get emergency-fund) amount))
+    (ok true)
+  )
+)
+
+(define-public (request-emergency-aid (reason (string-ascii 128)))
+  (let (
+    (recycler-data (unwrap! (map-get? recycler-profiles { recycler: tx-sender }) ERR_NOT_FOUND))
+    (aid-amount (if (>= (get reputation-score recycler-data) u20) u1000 u500))
+  )
+    (asserts! (>= (var-get emergency-fund) aid-amount) ERR_INSUFFICIENT_FUNDS)
+    (asserts! (>= (get reputation-score recycler-data) u5) ERR_UNAUTHORIZED)
+    (try! (as-contract (stx-transfer? aid-amount tx-sender tx-sender)))
+    (var-set emergency-fund (- (var-get emergency-fund) aid-amount))
+    (ok aid-amount)
+  )
+)
+
+(define-read-only (get-emergency-fund-balance)
+  (var-get emergency-fund)
+)
+
 (define-public (transfer-tokens (amount uint) (recipient principal))
   (begin
     (asserts! (> amount u0) ERR_INVALID_AMOUNT)

@@ -1,4 +1,3 @@
-## 🌍 Overview
 A blockchain-based DAO that empowers informal recyclers through tokenized rewards, transparent supply chains, and collective funding mechanisms.
 
 ## 🔥 Problem Solved
@@ -11,6 +10,7 @@ A blockchain-based DAO that empowers informal recyclers through tokenized reward
 - 🏢 **Collection Center Registry**: Verified centers validate recycling submissions
 - 🗳️ **DAO Governance**: Community voting on funding, healthcare, and micro-loans
 - 📊 **ESG Data Tracking**: Transparent environmental impact metrics for funders
+- 🆘 **Emergency Aid System**: Community-funded emergency relief for recyclers in crisis
 
 ## 🚀 Quick Start
 
@@ -66,6 +66,10 @@ clarinet deploy
 - `provide-loan` - Automated micro-loans for qualified recyclers
 - `repay-loan` - Repay outstanding loans
 
+### 🆘 Emergency Aid
+- `contribute-emergency-fund` - Contribute to emergency relief fund
+- `request-emergency-aid` - Request emergency financial assistance
+- `get-emergency-fund-balance` - Check emergency fund balance
 ### 📖 Read Functions
 - `get-collection-center` - Get center details
 - `get-recycler-profile` - Get recycler stats
@@ -88,6 +92,7 @@ clarinet deploy
 ## 📈 ESG Integration
 Funders can track:
 - CO2 emissions saved
+- Emergency aid system for recyclers facing crises
 - Total waste processed
 - Individual recycler impact
 - Timestamp verification
