@@ -11,6 +11,7 @@ A blockchain-based DAO that empowers informal recyclers through tokenized reward
 - 🗳️ **DAO Governance**: Community voting on funding, healthcare, and micro-loans
 - 📊 **ESG Data Tracking**: Transparent environmental impact metrics for funders
 - 🆘 **Emergency Aid System**: Community-funded emergency relief for recyclers in crisis
+- 👥 **Referral Program**: Incentivize community growth through token rewards for successful referrals
 
 ## 🚀 Quick Start
 
@@ -46,7 +47,17 @@ clarinet deploy
 (contract-call? .recyclers-cooperative-dao fund-dao u5000)
 ```
 
-## 📋 Contract Functions
+#### 👥 Generate Referral Code
+```clarity
+(contract-call? .recyclers-cooperative-dao generate-referral-code)
+```
+
+#### 👥 Use Referral Code
+```clarity
+(contract-call? .recyclers-cooperative-dao use-referral-code "REF1")
+```
+
+## � Contract Functions
 
 ### 🏗️ Administrative
 - `register-collection-center` - Register new collection center
@@ -70,7 +81,12 @@ clarinet deploy
 - `contribute-emergency-fund` - Contribute to emergency relief fund
 - `request-emergency-aid` - Request emergency financial assistance
 - `get-emergency-fund-balance` - Check emergency fund balance
-### 📖 Read Functions
+
+### 👥 Referral Program
+- `generate-referral-code` - Generate unique referral code for sharing
+- `use-referral-code` - Redeem referral code for token rewards
+- `get-referral-code` - Check referral code status
+### � Read Functions
 - `get-collection-center` - Get center details
 - `get-recycler-profile` - Get recycler stats
 - `get-proposal` - Get proposal details
@@ -79,6 +95,7 @@ clarinet deploy
 
 ## 🎯 Token Economics
 - 10 tokens earned per unit of waste recycled
+- 50 tokens bonus for successful referrals (25 for referrer, 25 for referee)
 - Minimum 100 tokens required to create proposals
 - Token balance determines voting weight
 - Reputation score affects loan eligibility
@@ -98,7 +115,10 @@ Funders can track:
 - Timestamp verification
 
 ## 🤝 Contributing
-This is an MVP implementation. Future enhancements include:
+This is an MVP implementation. Recent enhancements include:
+- 👥 Referral program for community growth incentives
+
+Future enhancements include:
 - Multi-token support
 - Advanced reputation algorithms
 - Integration with IoT sensors

@@ -431,7 +431,48 @@
   )
 )
 
+(define-map referral-codes
+  { code: (string-ascii 43) }
+  { referrer: principal, used: bool }
+)
+
+(define-data-var next-referral-id uint u1)
+
 (define-data-var emergency-fund uint u0)
+
+(define-public (generate-referral-code)
+  (let ((referral-id (var-get next-referral-id)))
+    (var-set next-referral-id (+ referral-id u1))
+    (let ((code (concat "REF" (int-to-ascii referral-id))))
+      (map-set referral-codes
+        { code: code }
+        { referrer: tx-sender, used: false }
+      )
+      (ok code)
+    )
+  )
+)
+
+(define-public (use-referral-code (code (string-ascii 16)))
+  (let (
+    (referral-data (unwrap! (map-get? referral-codes { code: code }) ERR_NOT_FOUND))
+    (referrer (get referrer referral-data))
+  )
+    (asserts! (not (get used referral-data)) ERR_ALREADY_EXISTS)
+    (asserts! (not (is-eq referrer tx-sender)) ERR_UNAUTHORIZED)
+    (map-set referral-codes
+      { code: code }
+      (merge referral-data { used: true })
+    )
+    (try! (ft-mint? recycle-token u50 referrer))
+    (try! (ft-mint? recycle-token u25 tx-sender))
+    (ok true)
+  )
+)
+
+(define-read-only (get-referral-code (code (string-ascii 16)))
+  (map-get? referral-codes { code: code })
+)
 
 (define-public (contribute-emergency-fund (amount uint))
   (begin
