@@ -431,6 +431,11 @@
   )
 )
 
+(define-map material-multipliers
+  { material: (string-ascii 32) }
+  { multiplier: uint }
+)
+
 (define-map referral-codes
   { code: (string-ascii 43) }
   { referrer: principal, used: bool }

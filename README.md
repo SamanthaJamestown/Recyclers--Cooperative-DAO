@@ -117,6 +117,7 @@ Funders can track:
 ## 🤝 Contributing
 This is an MVP implementation. Recent enhancements include:
 - 👥 Referral program for community growth incentives
+- 🔄 Material-specific reward multipliers for targeted recycling incentives
 
 Future enhancements include:
 - Multi-token support
